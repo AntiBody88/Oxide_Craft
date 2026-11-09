@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор крафта — Oxide Survival Island</title>
+<style>
+  :root {
+    --bg: #0f1217;
+    --panel: #181d24;
+    --panel-2: #1f252e;
+    --border: #2a313a;
+    --text: #d7dee7;
+    --muted: #7d8b9c;
+    --accent: #e8b84b;
+    --accent-soft: rgba(232,184,75,0.12);
+    --danger: #ef5b5b;
+    --success: #4fd18b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f1217;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px 14px 40px;
+    display: flex;
+    justify-content: center;
+  }
+  .app { width: 100%; max-width: 880px; }
+
+  .header { text-align: center; margin-bottom: 20px; }
+  .header h1 {
+    font-size: 1.45rem; font-weight: 800; color: var(--accent);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .header p { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+  .tabs {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 14px;
+    justify-content: center;
+  }
+  .tab {
+    padding: 8px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { border-color: var(--muted); color: var(--text); }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0f1217;
+  }
+  .tab svg { width: 14px; height: 14px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .panel-title {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 12px;
+  }
+
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search-wrap input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap .search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--muted); pointer-events: none;
+  }
+
+  /* ===== СЕТКА НА 3 КОЛОНКИ ===== */
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 4px;
+    margin-bottom: 12px;
+  }
+  .items-grid::-webkit-scrollbar { width: 6px; }
+  .items-grid::-webkit-scrollbar-track { background: transparent; }
+  .items-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .item-card {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 6px;
+    background: var(--panel-2);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .12s;
+    color: var(--text);
+    user-select: none;
+    text-align: center;
+  }
+  .item-card:hover { border-color: var(--border); background: #262e38; }
+  .item-card.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .item-card .icon {
+    width: 56px; height: 56px;
+    border-radius: 9px;
+    background: #141920;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .item-card .icon svg { width: 34px; height: 34px; }
+  .item-card .icon img { width: 100%; height: 100%; object-fit: cover; }
+  .item-card .name {
+    font-size: 0.74rem;
+    line-height: 1.2;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    max-width: 100%;
+  }
+
+  .empty-msg {
+    grid-column: 1 / -1;
+    text-align: center; color: var(--muted);
+    padding: 30px; font-size: 0.85rem;
+  }
+
+  .qty-row {
+    display: grid; grid-template-columns: 1fr 2fr; gap: 10px; align-items: end;
+  }
+  .field label {
+    display: block; font-size: 0.75rem; color: var(--muted);
+    margin-bottom: 5px; font-weight: 500;
+  }
+  .field input[type="number"] {
+    width: 100%; padding: 10px 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 0.9rem;
+    outline: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .btn {
+    padding: 11px 16px;
+    background: var(--accent); color: #0f1217;
+    border: none; border-radius: 8px;
+    font-weight: 800; font-size: 0.88rem;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: #f5c95e; }
+
+  .selected-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .selected-item .icon {
+    width: 64px; height: 64px;
+    border-radius: 10px;
+    background: #141920;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .selected-item .icon svg { width: 42px; height: 42px; }
+  .selected-item .icon img { width: 100%; height: 100%; object-fit: cover; }
+  .selected-item .name { font-weight: 700; color: var(--accent); font-size: 1rem; }
+  .selected-item .cat { margin-left: auto; color: var(--muted); font-size: 0.72rem; text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.7px; color: var(--muted); font-weight: 600;
+    padding: 0 8px 8px; border-bottom: 1px solid var(--border);
+  }
+  tbody td {
+    padding: 9px 8px; border-bottom: 1px solid var(--border);
+    font-size: 0.85rem; vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .mat-cell { display: flex; align-items: center; gap: 10px; }
+  .mat-cell .icon {
+    width: 38px; height: 38px; border-radius: 7px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .mat-cell .icon svg { width: 24px; height: 24px; }
+  .mat-cell .icon img { width: 100%; height: 100%; object-fit: cover; }
+
+  .owned-input {
+    width: 68px; padding: 5px 7px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 0.82rem;
+    text-align: center; outline: none;
+  }
+  .owned-input:focus { border-color: var(--accent); }
+
+  .missing { color: var(--danger); font-weight: 700; }
+  .ok { color: var(--success); font-weight: 700; }
+  .hint { font-size: 0.72rem; color: var(--muted); line-height: 1.5; margin-top: 10px; }
+
+  @media (max-width: 560px) {
+    .qty-row { grid-template-columns: 1fr; }
+    .items-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .item-card { padding: 8px 4px; gap: 4px; }
+    .item-card .icon { width: 48px; height: 48px; }
+    .item-card .icon svg { width: 30px; height: 30px; }
+    .item-card .name { font-size: 0.7rem; }
+    thead th, tbody td { padding: 8px 4px; font-size: 0.78rem; }
+    .owned-input { width: 54px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>🔨 Калькулятор крафта</h1>
+    <p>Oxide Survival Island</p>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="panel">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input type="text" id="searchInput" placeholder="Поиск по всем категориям..." oninput="renderItems()">
+    </div>
+    <div class="items-grid" id="itemsGrid"></div>
+    <div class="qty-row">
+      <div class="field">
+        <label for="qtyInput">Количество</label>
+        <input type="number" id="qtyInput" value="1" min="1" step="1">
+      </div>
+      <button class="btn" onclick="calculate()">Рассчитать материалы</button>
+    </div>
+  </div>
+
+  <div class="panel" id="resultPanel" style="display:none;">
+    <div class="selected-item" id="selectedItem"></div>
+    <div class="panel-title">Необходимые материалы</div>
+    <table>
+      <thead><tr><th>Материал</th><th>Нужно</th><th>Есть</th><th>Не хватает</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+    <div class="hint">Учитываются только прямые ингредиенты. Промежуточные предметы не разбираются.</div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   SVG-ИКОНКИ КАТЕГОРИЙ
+   ========================================================= */
+const SVG = {
+  building: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>`,
+  tool: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+  weapon: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a3 3 0 0 1 3 3v2h2v3h-2v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2H8l-2 4H3l2-5V8z"/><path d="M16 11h3"/></svg>`,
+  ammo: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><rect x="7" y="8" width="10" height="14" rx="2"/><path d="M10 12h4M10 16h4"/></svg>`,
+  medicine: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="2"/><path d="M12 9v6M9 12h6"/></svg>`,
+  armor: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  material: `<svg viewBox="0 0 24 24" fill="none" stroke="#9fb3c8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l8-4 8 4-8 4-8-4z"/><path d="M4 8v8l8 4 8-4V8"/><path d="M12 12v8"/></svg>`,
+  other: `<svg viewBox="0 0 24 24" fill="none" stroke="#7d8b9c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/></svg>`,
+};
+
+/* =========================================================
+   БАЗА ПРЕДМЕТОВ: id → { name, category }
+   ========================================================= */
+const ITEMS = {
+  // --- Постройки (35) ---
+  campfire: { name: "Костёр", category: "Постройки" },
+  sleeping_bag: { name: "Спальный мешок", category: "Постройки" },
+  bed: { name: "Кровать", category: "Постройки" },
+  repair_bench: { name: "Ремонтный шкаф", category: "Постройки" },
+  workbench: { name: "Верстак", category: "Постройки" },
+  anvil: { name: "Наковальня", category: "Постройки" },
+  door_lock: { name: "Дверной замок", category: "Постройки" },
+  code_lock: { name: "Кодовый замок", category: "Постройки" },
+  furnace: { name: "Печь", category: "Постройки" },
+  large_furnace: { name: "Улучшенная печь", category: "Постройки" },
+  small_box: { name: "Ящик", category: "Постройки" },
+  large_box: { name: "Большой ящик", category: "Постройки" },
+  wooden_door: { name: "Деревянная дверь", category: "Постройки" },
+  wooden_double_door: { name: "Деревянная двухстворчатая дверь", category: "Постройки" },
+  metal_door: { name: "Железная дверь", category: "Постройки" },
+  metal_double_door: { name: "Металлическая двухстворчатая дверь", category: "Постройки" },
+  garage_door: { name: "Гаражная дверь", category: "Постройки" },
+  armored_door: { name: "Бронированная дверь", category: "Постройки" },
+  armored_double_door: { name: "Бронированная двойная дверь", category: "Постройки" },
+  window: { name: "Окно", category: "Постройки" },
+  metal_embrasure: { name: "Металлическая амбразура", category: "Постройки" },
+  high_wood_wall: { name: "Высокая деревянная стена", category: "Постройки" },
+  high_wood_gate: { name: "Высокие деревянные ворота", category: "Постройки" },
+  wood_tower: { name: "Деревянная башня", category: "Постройки" },
+  high_stone_wall: { name: "Высокая каменная стена", category: "Постройки" },
+  high_stone_gate: { name: "Высокие каменные ворота", category: "Постройки" },
+  lamp: { name: "Лампа", category: "Постройки" },
+  metal_square_hatch: { name: "Металлический квадратный люк", category: "Постройки" },
+  metal_triangle_hatch: { name: "Металлический треугольный люк", category: "Постройки" },
+  armored_square_hatch: { name: "Армированный квадратный люк", category: "Постройки" },
+  armored_triangle_hatch: { name: "Армированный треугольный люк", category: "Постройки" },
+  shotgun_trap: { name: "Ловушка из дробовика", category: "Постройки" },
+  shotgun_turret: { name: "Турель-дробовик", category: "Постройки" },
+  machinegun_turret: { name: "Турель-пулемет", category: "Постройки" },
+  vending_machine: { name: "Торговый автомат", category: "Постройки" },
+
+  // --- Инструменты (8) ---
+  torch: { name: "Факел", category: "Инструменты" },
+  stone_axe: { name: "Каменный топор", category: "Инструменты" },
+  axe: { name: "Топор", category: "Инструменты" },
+  pickaxe: { name: "Кирка", category: "Инструменты" },
+  chainsaw: { name: "Пила-потрошитель", category: "Инструменты" },
+  stone_crusher: { name: "Камнекрушитель", category: "Инструменты" },
+  chainsaw_heavy: { name: "Бензопила", category: "Инструменты" },
+  drill: { name: "Бур", category: "Инструменты" },
+
+  // --- Оружие (28) ---
+  wood_spear: { name: "Деревянное копьё", category: "Оружие" },
+  metal_spear: { name: "Железное копьё", category: "Оружие" },
+  bone_club: { name: "Костяная дубина", category: "Оружие" },
+  machete: { name: "Мачете", category: "Оружие" },
+  mace: { name: "Булава", category: "Оружие" },
+  spiked_wood_club: { name: "Деревянная шипованна дубинка", category: "Оружие" },
+  wood_bow: { name: "Деревянный лук", category: "Оружие" },
+  crossbow: { name: "Арбалет", category: "Оружие" },
+  homemade_pistol: { name: "Самопал", category: "Оружие" },
+  metal_thrower: { name: "Металомёт", category: "Оружие" },
+  crafted_pistol: { name: "Кустарный пистолет", category: "Оружие" },
+  revolver: { name: "Револьвер", category: "Оружие" },
+  desert_eagle: { name: "Desrt Eagle", category: "Оружие" },
+  smg: { name: "Пистолет-пулемет", category: "Оружие" },
+  thompson: { name: "Томпсон", category: "Оружие" },
+  w94: { name: "W94", category: "Оружие" },
+  double_barrel_shotgun: { name: "Двуствольный дробовик", category: "Оружие" },
+  shotgun: { name: "Дробовик", category: "Оружие" },
+  hunting_rifle: { name: "Охотничья винтовка", category: "Оружие" },
+  semi_auto_rifle: { name: "Полуавтоматическая винтовка", category: "Оружие" },
+  assault_rifle: { name: "Штурмовая винтовка", category: "Оружие" },
+  b51: { name: "B51", category: "Оружие" },
+  rpg: { name: "РПГ", category: "Оружие" },
+  homemade_scope: { name: "Самодельный прицел", category: "Оружие" },
+  muzzle_brake: { name: "Дульный тормоз", category: "Оружие" },
+  extended_mag: { name: "Увеличенный магазин", category: "Оружие" },
+  compensator: { name: "Компенсатор", category: "Оружие" },
+  holographic_sight: { name: "Голографический прицел", category: "Оружие" },
+
+  // --- Боеприпасы (13) ---
+  arrow: { name: "Стрела", category: "Боеприпасы" },
+  bolt: { name: "Болт", category: "Боеприпасы" },
+  steel_ball: { name: "Стальной шарик", category: "Боеприпасы" },
+  homemade_ammo: { name: "Самодельный патрон", category: "Боеприпасы" },
+  pistol_ammo: { name: "Пистолетный патрон", category: "Боеприпасы" },
+  buckshot_12g: { name: "Картечь 12 калибра", category: "Боеприпасы" },
+  ammo_556: { name: "5.56 винтовочный патрон", category: "Боеприпасы" },
+  smoke_grenade: { name: "Дымовая граната", category: "Боеприпасы" },
+  homemade_grenade: { name: "Самодельная граната", category: "Боеприпасы" },
+  f1_grenade: { name: "Граната ф-1", category: "Боеприпасы" },
+  rocket: { name: "Ракета", category: "Боеприпасы" },
+  pressure_mine: { name: "Нажимная мина", category: "Боеприпасы" },
+  timed_explosive: { name: "Подрывной заряд с таймером", category: "Боеприпасы" },
+
+  // --- Медицина (2) ---
+  bandage: { name: "Бинт", category: "Медицина" },
+  medkit: { name: "Аптечка", category: "Медицина" },
+
+  // --- Броня (18) ---
+  wood_helmet: { name: "Деревянный шлем", category: "Броня" },
+  wood_chestplate: { name: "Деревянный нагрудник", category: "Броня" },
+  wood_legs: { name: "Деревянная защита ног", category: "Броня" },
+  wood_sandals: { name: "Деревянный сандали", category: "Броня" },
+  bone_helmet: { name: "Костяной шлем", category: "Броня" },
+  bone_chestplate: { name: "Костяной нагрудник", category: "Броня" },
+  bone_legs: { name: "Костяная защита ног", category: "Броня" },
+  bone_boots: { name: "Костяная обувь", category: "Броня" },
+  leather_helmet: { name: "Кожаный шлем", category: "Броня" },
+  leather_chestplate: { name: "Кожаный нагрудник", category: "Броня" },
+  leather_legs: { name: "Кожаная защита ног", category: "Броня" },
+  leather_boots: { name: "Кожаные сапоги", category: "Броня" },
+  metal_helmet: { name: "Металлический шлем", category: "Броня" },
+  metal_chestplate: { name: "Металлический нагрудник", category: "Броня" },
+  metal_legs: { name: "Металлические штаны", category: "Броня" },
+  metal_boots: { name: "Металлические ботинки", category: "Броня" },
+  rad_suit: { name: "Антирадиационный костюм", category: "Броня" },
+  backpack: { name: "Рюкзак", category: "Броня" },
+
+  // --- Материалы (9) ---
+  rope: { name: "Верёвка", category: "Материалы" },
+  sewing_kit: { name: "Швейный набор", category: "Материалы" },
+  gunpowder: { name: "Порох", category: "Материалы" },
+  fuel_bottle: { name: "Бутыль топливо", category: "Материалы" },
+  gears: { name: "Шестерни", category: "Материалы" },
+  metal_pipe: { name: "Металлическая труба", category: "Материалы" },
+  metal_spring: { name: "Металлическая пружина", category: "Материалы" },
+  explosives: { name: "Взрывчатка", category: "Материалы" },
+  battery: { name: "Аккумулятор", category: "Материалы" },
+
+  // --- Другое (2) ---
+  sticker: { name: "Стикер", category: "Другое" },
+  snowball: { name: "Снежок", category: "Другое" },
+};
+
+/* =========================================================
+   КАТЕГОРИИ
+   ========================================================= */
+const CATEGORIES = [
+  { id: "buildings",  name: "Постройки",  icon: SVG.building },
+  { id: "tools",      name: "Инструменты", icon: SVG.tool },
+  { id: "weapons",    name: "Оружие",     icon: SVG.weapon },
+  { id: "ammo",       name: "Боеприпасы", icon: SVG.ammo },
+  { id: "medicine",   name: "Медицина",   icon: SVG.medicine },
+  { id: "armor",      name: "Броня",      icon: SVG.armor },
+  { id: "materials",  name: "Материалы",  icon: SVG.material },
+  { id: "other",      name: "Другое",     icon: SVG.other },
+];
+
+/* =========================================================
+   ИКОНКИ: id → путь (.jpg)
+   ========================================================= */
+const pngMap = {
+  // Постройки (35)
+  campfire: "icons/campfire.jpg",
+  sleeping_bag: "icons/sleeping_bag.jpg",
+  bed: "icons/bed.jpg",
+  repair_bench: "icons/repair_bench.jpg",
+  workbench: "icons/workbench.jpg",
+  anvil: "icons/anvil.jpg",
+  door_lock: "icons/door_lock.jpg",
+  code_lock: "icons/code_lock.jpg",
+  furnace: "icons/furnace.jpg",
+  large_furnace: "icons/large_furnace.jpg",
+  small_box: "icons/small_box.jpg",
+  large_box: "icons/large_box.jpg",
+  wooden_door: "icons/wooden_door.jpg",
+  wooden_double_door: "icons/wooden_double_door.jpg",
+  metal_door: "icons/metal_door.jpg",
+  metal_double_door: "icons/metal_double_door.jpg",
+  garage_door: "icons/garage_door.jpg",
+  armored_door: "icons/armored_door.jpg",
+  armored_double_door: "icons/armored_double_door.jpg",
+  window: "icons/window.jpg",
+  metal_embrasure: "icons/metal_embrasure.jpg",
+  high_wood_wall: "icons/high_wood_wall.jpg",
+  high_wood_gate: "icons/high_wood_gate.jpg",
+  wood_tower: "icons/wood_tower.jpg",
+  high_stone_wall: "icons/high_stone_wall.jpg",
+  high_stone_gate: "icons/high_stone_gate.jpg",
+  lamp: "icons/lamp.jpg",
+  metal_square_hatch: "icons/metal_square_hatch.jpg",
+  metal_triangle_hatch: "icons/metal_triangle_hatch.jpg",
+  armored_square_hatch: "icons/armored_square_hatch.jpg",
+  armored_triangle_hatch: "icons/armored_triangle_hatch.jpg",
+  shotgun_trap: "icons/shotgun_trap.jpg",
+  shotgun_turret: "icons/shotgun_turret.jpg",
+  machinegun_turret: "icons/machinegun_turret.jpg",
+  vending_machine: "icons/vending_machine.jpg",
+};
+
+/* =========================================================
+   РЕЦЕПТЫ: id → { id материала: количество }
+   Все 35 построек заполнены
+   ========================================================= */
+const recipes = {
+  campfire: { stone: 25 },
+  sleeping_bag: { cloth: 10 },
+  bed: { wood: 40, cloth: 20, metal_fragment: 30 },
+  repair_bench: { wood: 100 },
+  workbench: { wood: 100, scrap: 50 },
+  anvil: { metal_fragment: 30 },
+  door_lock: { wood: 20 },
+  code_lock: { metal_fragment: 30 },
+  furnace: { stone: 50 },
+  large_furnace: { stone: 250, wood: 75, metal_fragment: 80, mvk: 10 },
+  small_box: { wood: 25 },
+  large_box: { wood: 50, metal_fragment: 20 },
+  wooden_door: { wood: 20 },
+  wooden_double_door: { wood: 50 },
+  metal_door: { metal_fragment: 35 },
+  metal_double_door: { metal_fragment: 80 },
+  garage_door: { gears: 2, metal_fragment: 50, sheet_metal: 2 },
+  armored_door: { gears: 3, sheet_metal: 3, mvk: 20 },
+  armored_double_door: { sheet_metal: 4, gears: 4, mvk: 40 },
+  window: { wood: 10 },
+  metal_embrasure: { metal_fragment: 30 },
+  high_wood_wall: { wood: 150 },
+  high_wood_gate: { wood: 250, rope: 3, gears: 2 },
+  wood_tower: { wood: 200, rope: 3 },
+  high_stone_wall: { stone: 150, mvk: 2 },
+  high_stone_gate: { stone: 250, gears: 4, mvk: 2 },
+  lamp: { metal_fragment: 10 },
+  metal_square_hatch: { metal_fragment: 50, gears: 3 },
+  metal_triangle_hatch: { metal_fragment: 50, gears: 3 },
+  armored_square_hatch: { mvk: 20, gears: 6 },
+  armored_triangle_hatch: { mvk: 20, gears: 6 },
+  shotgun_trap: { scrap: 20, wood: 25, gears: 2, metal_fragment: 60 },
+  shotgun_turret: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, shotgun: 1 },
+  machinegun_turret: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, b51: 1 },
+  vending_machine: { gears: 2, tech_trash: 2, metal_fragment: 20, mvk: 5 },
+};
+
+/* =========================================================
+   ДОПОЛНИТЕЛЬНЫЕ РЕСУРСЫ (не отображаются в категориях)
+   ========================================================= */
+const EXTRA_RESOURCES = {
+  // базовые
+  wood: { name: "Дерево", category: "Материалы" },
+  stone: { name: "Камень", category: "Материалы" },
+  cloth: { name: "Ткань", category: "Материалы" },
+  leather: { name: "Кожа", category: "Материалы" },
+  metal_fragment: { name: "Металлические фрагменты", category: "Материалы" },
+  // ранее добавленные
+  scrap: { name: "Металлолом", category: "Материалы" },
+  mvk: { name: "МВК", category: "Материалы" },
+  sheet_metal: { name: "Листовой металл", category: "Материалы" },
+  cctv_camera: { name: "Камера видеонаблюдения", category: "Материалы" },
+  targeting_computer: { name: "Компьютер наведения", category: "Материалы" },
+  metal_blade: { name: "Металлическое лезвие", category: "Материалы" },
+  // новые
+  rope: { name: "Веревка", category: "Материалы" },
+  shotgun: { name: "Дробовик", category: "Оружие" },
+  b51: { name: "B51", category: "Оружие" },
+  tech_trash: { name: "Технический мусор", category: "Материалы" },
+  metal_pipe: { name: "Металлическая труба", category: "Материалы" },
+  bone: { name: "Кость", category: "Материалы" },
+  smg_body: { name: "Корпус пистолета-пулемета", category: "Материалы" },
+  rifle_body: { name: "Корпус винтовки", category: "Материалы" },
+  semi_auto_rifle_body: { name: "Корпус полуавтоматической винтовки", category: "Материалы" },
+  gunpowder: { name: "Порох", category: "Материалы" },
+  sulfur: { name: "Сера", category: "Материалы" },
+  coal: { name: "Уголь", category: "Материалы" },
+  fuel_bottle: { name: "Бутыль топлива", category: "Материалы" },
+  sewing_kit: { name: "Швейный набор", category: "Материалы" },
+  tarp: { name: "Брезент", category: "Материалы" },
+  animal_fat: { name: "Животный жир", category: "Материалы" },
+  gears: { name: "Шестерни", category: "Материалы" },
+  metal_spring: { name: "Металлическая пружина", category: "Материалы" },
+};
+
+/* =========================================================
+   ЛОГИКА
+   ========================================================= */
+let currentCategory = "buildings";
+let selectedId = null;
+
+const tabsEl = document.getElementById('tabs');
+const itemsGrid = document.getElementById('itemsGrid');
+const searchInput = document.getElementById('searchInput');
+
+function getItem(id) {
+  return ITEMS[id] || EXTRA_RESOURCES[id] || null;
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (cat.id === currentCategory ? ' active' : '');
+    tab.innerHTML = `${cat.icon}<span>${cat.name}</span>`;
+    tab.onclick = () => {
+      currentCategory = cat.id;
+      searchInput.value = '';
+      renderTabs();
+      renderItems();
+    };
+    tabsEl.appendChild(tab);
+  });
+}
+
+function getIconHTML(itemId, catName) {
+  if (pngMap[itemId]) {
+    const fallback = CATEGORIES.find(c => c.name === catName)?.icon || SVG.other;
+    const safe = fallback.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<img src="${pngMap[itemId]}" alt="" onerror="this.outerHTML='${safe}'">`;
+  }
+  const cat = CATEGORIES.find(c => c.name === catName);
+  return cat?.icon || SVG.other;
+}
+
+function renderItems() {
+  const query = searchInput.value.trim().toLowerCase();
+  itemsGrid.innerHTML = '';
+  selectedId = null;
+
+  let ids;
+  if (query) {
+    ids = Object.keys(ITEMS).filter(id => ITEMS[id].name.toLowerCase().includes(query));
+  } else {
+    const catName = CATEGORIES.find(c => c.id === currentCategory)?.name;
+    ids = Object.keys(ITEMS).filter(id => ITEMS[id].category === catName);
+  }
+
+  if (ids.length === 0) {
+    itemsGrid.innerHTML = '<div class="empty-msg">' + (query ? 'Ничего не найдено' : 'В этой категории пока нет предметов') + '</div>';
+    return;
+  }
+
+  ids.forEach(id => {
+    const item = ITEMS[id];
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <div class="icon">${getIconHTML(id, item.category)}</div>
+      <span class="name">${item.name}</span>
+    `;
+    card.onclick = () => {
+      document.querySelectorAll('.item-card.active').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedId = id;
+    };
+    itemsGrid.appendChild(card);
+  });
+}
+
+function calculate() {
+  if (!selectedId) {
+    alert('Сначала выберите предмет из списка');
+    return;
+  }
+
+  const item = getItem(selectedId);
+  const qty = Math.max(1, parseInt(document.getElementById('qtyInput').value) || 1);
+  const recipe = recipes[selectedId];
+
+  document.getElementById('selectedItem').innerHTML = `
+    <div class="icon">${getIconHTML(selectedId, item.category)}</div>
+    <span class="name">${item.name}</span>
+    <span class="cat">${item.category} · ×${qty}</span>
+  `;
+
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+
+  if (!recipe || Object.keys(recipe).length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Рецепт для «${item.name}» ещё не заполнен.</td></tr>`;
+  } else {
+    for (const [matId, amount] of Object.entries(recipe)) {
+      const total = amount * qty;
+      const mat = getItem(matId);
+      const matName = mat ? mat.name : matId;
+      const matCat = mat ? mat.category : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><div class="mat-cell"><div class="icon">${getIconHTML(matId, matCat)}</div><span>${matName}</span></div></td>
+        <td>${total}</td>
+        <td><input type="number" class="owned-input" value="0" min="0"></td>
+        <td class="missing-cell">—</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('.owned-input').forEach(inp => {
+      inp.addEventListener('input', updateMissing);
+    });
+  }
+
+  document.getElementById('resultPanel').style.display = 'block';
+  updateMissing();
+}
+
+function updateMissing() {
+  document.querySelectorAll('#resultBody tr').forEach(tr => {
+    const needCell = tr.cells[1];
+    if (!needCell) return;
+    const need = parseInt(needCell.textContent) || 0;
+    const input = tr.querySelector('.owned-input');
+    if (!input) return;
+    const owned = parseInt(input.value) || 0;
+    const cell = tr.querySelector('.missing-cell');
+    const miss = Math.max(0, need - owned);
+    cell.textContent = miss > 0 ? miss : '✓';
+    cell.className = 'missing-cell ' + (miss > 0 ? 'missing' : 'ok');
+  });
+}
+
+renderTabs();
+renderItems();
+</script>
+</body>
+</html>
