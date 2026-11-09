@@ -92,7 +92,6 @@
     width: 15px; height: 15px; color: var(--muted); pointer-events: none;
   }
 
-  /* ===== СЕТКА НА 3 КОЛОНКИ ===== */
   .items-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -229,6 +228,26 @@
   .ok { color: var(--success); font-weight: 700; }
   .hint { font-size: 0.72rem; color: var(--muted); line-height: 1.5; margin-top: 10px; }
 
+  .time-block {
+    margin-top: 14px; padding: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .time-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0;
+    font-size: 0.85rem;
+  }
+  .time-row .label { color: var(--muted); }
+  .time-row .val { font-variant-numeric: tabular-nums; }
+  .time-row.total {
+    border-top: 1px solid var(--border);
+    margin-top: 6px; padding-top: 8px;
+    font-size: 1rem;
+  }
+  .time-row.total .label { color: var(--text); font-weight: 600; }
+  .time-row.total .val { color: var(--accent); font-weight: 800; }
+
   @media (max-width: 560px) {
     .qty-row { grid-template-columns: 1fr; }
     .items-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -273,14 +292,15 @@
       <thead><tr><th>Материал</th><th>Нужно</th><th>Есть</th><th>Не хватает</th></tr></thead>
       <tbody id="resultBody"></tbody>
     </table>
-    <div class="hint">Учитываются только прямые ингредиенты. Промежуточные предметы не разбираются.</div>
+    <div class="hint">Количество указано с учётом выхода за крафт. Время — рекурсивно по цепочке.</div>
+    <div class="time-block" id="timeBlock"></div>
   </div>
 
 </div>
 
 <script>
 /* =========================================================
-   SVG-ИКОНКИ КАТЕГОРИЙ
+   SVG-ИКОНКИ
    ========================================================= */
 const SVG = {
   building: `<svg viewBox="0 0 24 24" fill="none" stroke="#e8b84b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>`,
@@ -294,10 +314,10 @@ const SVG = {
 };
 
 /* =========================================================
-   БАЗА ПРЕДМЕТОВ: id → { name, category }
+   БАЗА ПРЕДМЕТОВ
    ========================================================= */
 const ITEMS = {
-  // --- Постройки (35) ---
+  // Постройки (35)
   campfire: { name: "Костёр", category: "Постройки" },
   sleeping_bag: { name: "Спальный мешок", category: "Постройки" },
   bed: { name: "Кровать", category: "Постройки" },
@@ -334,7 +354,7 @@ const ITEMS = {
   machinegun_turret: { name: "Турель-пулемет", category: "Постройки" },
   vending_machine: { name: "Торговый автомат", category: "Постройки" },
 
-  // --- Инструменты (8) ---
+  // Инструменты (8)
   torch: { name: "Факел", category: "Инструменты" },
   stone_axe: { name: "Каменный топор", category: "Инструменты" },
   axe: { name: "Топор", category: "Инструменты" },
@@ -344,13 +364,13 @@ const ITEMS = {
   chainsaw_heavy: { name: "Бензопила", category: "Инструменты" },
   drill: { name: "Бур", category: "Инструменты" },
 
-  // --- Оружие (28) ---
+  // Оружие (28)
   wood_spear: { name: "Деревянное копьё", category: "Оружие" },
   metal_spear: { name: "Железное копьё", category: "Оружие" },
   bone_club: { name: "Костяная дубина", category: "Оружие" },
   machete: { name: "Мачете", category: "Оружие" },
   mace: { name: "Булава", category: "Оружие" },
-  spiked_wood_club: { name: "Деревянная шипованна дубинка", category: "Оружие" },
+  spiked_wood_club: { name: "Деревянная шипованная дубинка", category: "Оружие" },
   wood_bow: { name: "Деревянный лук", category: "Оружие" },
   crossbow: { name: "Арбалет", category: "Оружие" },
   homemade_pistol: { name: "Самопал", category: "Оружие" },
@@ -374,7 +394,7 @@ const ITEMS = {
   compensator: { name: "Компенсатор", category: "Оружие" },
   holographic_sight: { name: "Голографический прицел", category: "Оружие" },
 
-  // --- Боеприпасы (13) ---
+  // Боеприпасы (13)
   arrow: { name: "Стрела", category: "Боеприпасы" },
   bolt: { name: "Болт", category: "Боеприпасы" },
   steel_ball: { name: "Стальной шарик", category: "Боеприпасы" },
@@ -389,15 +409,15 @@ const ITEMS = {
   pressure_mine: { name: "Нажимная мина", category: "Боеприпасы" },
   timed_explosive: { name: "Подрывной заряд с таймером", category: "Боеприпасы" },
 
-  // --- Медицина (2) ---
+  // Медицина (2)
   bandage: { name: "Бинт", category: "Медицина" },
   medkit: { name: "Аптечка", category: "Медицина" },
 
-  // --- Броня (18) ---
+  // Броня (18)
   wood_helmet: { name: "Деревянный шлем", category: "Броня" },
   wood_chestplate: { name: "Деревянный нагрудник", category: "Броня" },
   wood_legs: { name: "Деревянная защита ног", category: "Броня" },
-  wood_sandals: { name: "Деревянный сандали", category: "Броня" },
+  wood_sandals: { name: "Деревянный сандалии", category: "Броня" },
   bone_helmet: { name: "Костяной шлем", category: "Броня" },
   bone_chestplate: { name: "Костяной нагрудник", category: "Броня" },
   bone_legs: { name: "Костяная защита ног", category: "Броня" },
@@ -413,18 +433,18 @@ const ITEMS = {
   rad_suit: { name: "Антирадиационный костюм", category: "Броня" },
   backpack: { name: "Рюкзак", category: "Броня" },
 
-  // --- Материалы (9) ---
+  // Материалы (9)
   rope: { name: "Верёвка", category: "Материалы" },
   sewing_kit: { name: "Швейный набор", category: "Материалы" },
   gunpowder: { name: "Порох", category: "Материалы" },
-  fuel_bottle: { name: "Бутыль топливо", category: "Материалы" },
+  fuel_bottle: { name: "Бутыль топлива", category: "Материалы" },
   gears: { name: "Шестерни", category: "Материалы" },
   metal_pipe: { name: "Металлическая труба", category: "Материалы" },
   metal_spring: { name: "Металлическая пружина", category: "Материалы" },
   explosives: { name: "Взрывчатка", category: "Материалы" },
   battery: { name: "Аккумулятор", category: "Материалы" },
 
-  // --- Другое (2) ---
+  // Другое (2)
   sticker: { name: "Стикер", category: "Другое" },
   snowball: { name: "Снежок", category: "Другое" },
 };
@@ -444,10 +464,9 @@ const CATEGORIES = [
 ];
 
 /* =========================================================
-   ИКОНКИ: id → путь (.jpg)
+   ИКОНКИ
    ========================================================= */
 const pngMap = {
-  // Постройки (35)
   campfire: "icons/campfire.jpg",
   sleeping_bag: "icons/sleeping_bag.jpg",
   bed: "icons/bed.jpg",
@@ -486,65 +505,157 @@ const pngMap = {
 };
 
 /* =========================================================
-   РЕЦЕПТЫ: id → { id материала: количество }
-   Все 35 построек заполнены
+   РЕЦЕПТЫ: id → { materials, time, output }
+   output — сколько получается за 1 крафт (по умолчанию 1)
    ========================================================= */
 const recipes = {
-  campfire: { stone: 25 },
-  sleeping_bag: { cloth: 10 },
-  bed: { wood: 40, cloth: 20, metal_fragment: 30 },
-  repair_bench: { wood: 100 },
-  workbench: { wood: 100, scrap: 50 },
-  anvil: { metal_fragment: 30 },
-  door_lock: { wood: 20 },
-  code_lock: { metal_fragment: 30 },
-  furnace: { stone: 50 },
-  large_furnace: { stone: 250, wood: 75, metal_fragment: 80, mvk: 10 },
-  small_box: { wood: 25 },
-  large_box: { wood: 50, metal_fragment: 20 },
-  wooden_door: { wood: 20 },
-  wooden_double_door: { wood: 50 },
-  metal_door: { metal_fragment: 35 },
-  metal_double_door: { metal_fragment: 80 },
-  garage_door: { gears: 2, metal_fragment: 50, sheet_metal: 2 },
-  armored_door: { gears: 3, sheet_metal: 3, mvk: 20 },
-  armored_double_door: { sheet_metal: 4, gears: 4, mvk: 40 },
-  window: { wood: 10 },
-  metal_embrasure: { metal_fragment: 30 },
-  high_wood_wall: { wood: 150 },
-  high_wood_gate: { wood: 250, rope: 3, gears: 2 },
-  wood_tower: { wood: 200, rope: 3 },
-  high_stone_wall: { stone: 150, mvk: 2 },
-  high_stone_gate: { stone: 250, gears: 4, mvk: 2 },
-  lamp: { metal_fragment: 10 },
-  metal_square_hatch: { metal_fragment: 50, gears: 3 },
-  metal_triangle_hatch: { metal_fragment: 50, gears: 3 },
-  armored_square_hatch: { mvk: 20, gears: 6 },
-  armored_triangle_hatch: { mvk: 20, gears: 6 },
-  shotgun_trap: { scrap: 20, wood: 25, gears: 2, metal_fragment: 60 },
-  shotgun_turret: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, shotgun: 1 },
-  machinegun_turret: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, b51: 1 },
-  vending_machine: { gears: 2, tech_trash: 2, metal_fragment: 20, mvk: 5 },
+  // Постройки (35)
+  campfire: { materials: { stone: 25 }, time: 5 },
+  sleeping_bag: { materials: { cloth: 10 }, time: 10 },
+  bed: { materials: { wood: 40, cloth: 20, metal_fragment: 30 }, time: 60 },
+  repair_bench: { materials: { wood: 100 }, time: 30 },
+  workbench: { materials: { wood: 100, scrap: 50 }, time: 30 },
+  anvil: { materials: { metal_fragment: 30 }, time: 45 },
+  door_lock: { materials: { wood: 20 }, time: 15 },
+  code_lock: { materials: { metal_fragment: 30 }, time: 30 },
+  furnace: { materials: { stone: 50 }, time: 30 },
+  large_furnace: { materials: { stone: 250, wood: 75, metal_fragment: 80, mvk: 10 }, time: 30 },
+  small_box: { materials: { wood: 25 }, time: 15 },
+  large_box: { materials: { wood: 50, metal_fragment: 20 }, time: 30 },
+  wooden_door: { materials: { wood: 20 }, time: 15 },
+  wooden_double_door: { materials: { wood: 50 }, time: 15 },
+  metal_door: { materials: { metal_fragment: 35 }, time: 30 },
+  metal_double_door: { materials: { metal_fragment: 80 }, time: 30 },
+  garage_door: { materials: { gears: 2, metal_fragment: 50, sheet_metal: 2 }, time: 40 },
+  armored_door: { materials: { gears: 3, sheet_metal: 3, mvk: 20 }, time: 60 },
+  armored_double_door: { materials: { sheet_metal: 4, gears: 4, mvk: 40 }, time: 60 },
+  window: { materials: { wood: 10 }, time: 30 },
+  metal_embrasure: { materials: { metal_fragment: 30 }, time: 30 },
+  high_wood_wall: { materials: { wood: 150 }, time: 45 },
+  high_wood_gate: { materials: { wood: 250, rope: 3, gears: 2 }, time: 60 },
+  wood_tower: { materials: { wood: 200, rope: 3 }, time: 30 },
+  high_stone_wall: { materials: { stone: 150, mvk: 2 }, time: 30 },
+  high_stone_gate: { materials: { stone: 250, gears: 4, mvk: 2 }, time: 45 },
+  lamp: { materials: { metal_fragment: 10 }, time: 30 },
+  metal_square_hatch: { materials: { metal_fragment: 50, gears: 3 }, time: 20 },
+  metal_triangle_hatch: { materials: { metal_fragment: 50, gears: 3 }, time: 20 },
+  armored_square_hatch: { materials: { mvk: 20, gears: 6 }, time: 70 },
+  armored_triangle_hatch: { materials: { mvk: 20, gears: 6 }, time: 30 },
+  shotgun_trap: { materials: { scrap: 20, wood: 25, gears: 2, metal_fragment: 60 }, time: 30 },
+  shotgun_turret: { materials: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, shotgun: 1 }, time: 90 },
+  machinegun_turret: { materials: { cctv_camera: 1, targeting_computer: 1, mvk: 20, metal_spring: 5, b51: 1 }, time: 120 },
+  vending_machine: { materials: { gears: 2, tech_trash: 2, metal_fragment: 20, mvk: 5 }, time: 30 },
+
+  // Инструменты (8)
+  torch: { materials: { wood: 10, cloth: 5 }, time: 5 },
+  stone_axe: { materials: { wood: 10 }, time: 5 },
+  axe: { materials: { wood: 10, metal_fragment: 10 }, time: 15 },
+  pickaxe: { materials: { wood: 20, metal_fragment: 10 }, time: 15 },
+  chainsaw: { materials: { wood: 50, metal_blade: 2, metal_fragment: 30 }, time: 15 },
+  stone_crusher: { materials: { metal_blade: 2, metal_pipe: 1, metal_fragment: 30 }, time: 20 },
+  chainsaw_heavy: { materials: { mvk: 15, metal_blade: 3, gears: 3 }, time: 15 },
+  drill: { materials: { mvk: 15, metal_blade: 3, gears: 3 }, time: 15 },
+
+  // Оружие (28)
+  wood_spear: { materials: { wood: 50 }, time: 15 },
+  metal_spear: { materials: { wood: 50, metal_fragment: 25 }, time: 30 },
+  bone_club: { materials: { bone: 1, cloth: 5 }, time: 15 },
+  machete: { materials: { wood: 120, metal_fragment: 80, metal_blade: 2, rope: 2 }, time: 40 },
+  mace: { materials: { wood: 100, metal_fragment: 50, rope: 2 }, time: 40 },
+  spiked_wood_club: { materials: { wood: 20, cloth: 5, metal_fragment: 30 }, time: 30 },
+  wood_bow: { materials: { wood: 20, cloth: 15 }, time: 15 },
+  crossbow: { materials: { wood: 30, metal_fragment: 20, rope: 1 }, time: 60 },
+  homemade_pistol: { materials: { metal_fragment: 15, scrap: 10, cloth: 10 }, time: 45 },
+  metal_thrower: { materials: { metal_fragment: 25, scrap: 20 }, time: 30 },
+  crafted_pistol: { materials: { metal_fragment: 25, scrap: 10, metal_pipe: 1 }, time: 45 },
+  revolver: { materials: { mvk: 3, metal_fragment: 30, metal_pipe: 1 }, time: 45 },
+  desert_eagle: { materials: { metal_pipe: 3, metal_spring: 1, mvk: 10 }, time: 45 },
+  smg: { materials: { metal_spring: 1, metal_pipe: 1, metal_fragment: 25, scrap: 20 }, time: 60 },
+  thompson: { materials: { smg_body: 1, metal_spring: 2, mvk: 12 }, time: 60 },
+  w94: { materials: { metal_spring: 2, wood: 50, mvk: 7 }, time: 60 },
+  double_barrel_shotgun: { materials: { metal_pipe: 2, wood: 30, metal_fragment: 60 }, time: 30 },
+  shotgun: { materials: { metal_pipe: 2, metal_spring: 1, wood: 50, mvk: 10 }, time: 60 },
+  hunting_rifle: { materials: { rifle_body: 1, metal_spring: 1, metal_pipe: 2, mvk: 20 }, time: 90 },
+  semi_auto_rifle: { materials: { semi_auto_rifle_body: 1, metal_pipe: 2, mvk: 15, metal_spring: 1 }, time: 60 },
+  assault_rifle: { materials: { rifle_body: 1, metal_pipe: 3, mvk: 30, metal_spring: 2 }, time: 90 },
+  b51: { materials: { mvk: 45, gears: 3, rifle_body: 1, metal_spring: 3 }, time: 90 },
+  rpg: { materials: { metal_pipe: 2, metal_fragment: 100, mvk: 30, tech_trash: 1 }, time: 60 },
+  homemade_scope: { materials: { wood: 15, metal_fragment: 10 }, time: 60 },
+  muzzle_brake: { materials: { mvk: 5 }, time: 60 },
+  extended_mag: { materials: { mvk: 5 }, time: 60 },
+  compensator: { materials: { mvk: 10 }, time: 60 },
+  holographic_sight: { materials: { mvk: 5, tech_trash: 1 }, time: 60 },
+
+  // Боеприпасы (13)
+  arrow: { materials: { wood: 1, stone: 1 }, time: 2 },
+  bolt: { materials: { wood: 1, metal_fragment: 1 }, time: 3 },
+  steel_ball: { materials: { metal_fragment: 4 }, time: 5, output: 10 },
+  homemade_ammo: { materials: { gunpowder: 2, metal_fragment: 2 }, time: 5, output: 4 },
+  pistol_ammo: { materials: { gunpowder: 4, metal_fragment: 5 }, time: 5, output: 10 },
+  buckshot_12g: { materials: { gunpowder: 4, metal_fragment: 6 }, time: 5, output: 4 },
+  ammo_556: { materials: { gunpowder: 4, metal_fragment: 6 }, time: 5, output: 6 },
+  smoke_grenade: { materials: { metal_fragment: 10, sulfur: 10, cloth: 5 }, time: 30 },
+  homemade_grenade: { materials: { gunpowder: 15, scrap: 5, metal_fragment: 10 }, time: 20 },
+  f1_grenade: { materials: { gunpowder: 30, metal_fragment: 30 }, time: 20 },
+  rocket: { materials: { gunpowder: 50, metal_pipe: 3, explosives: 5 }, time: 25 },
+  pressure_mine: { materials: { gunpowder: 30, metal_fragment: 30, metal_spring: 1 }, time: 45 },
+  timed_explosive: { materials: { gunpowder: 100, cloth: 10, explosives: 5, tech_trash: 2 }, time: 45 },
+
+  // Медицина (2)
+  bandage: { materials: { cloth: 5 }, time: 5 },
+  medkit: { materials: { cloth: 15, metal_fragment: 10, fuel_bottle: 10 }, time: 20 },
+
+  // Броня (18)
+  wood_helmet: { materials: { wood: 10, cloth: 5 }, time: 20 },
+  wood_chestplate: { materials: { wood: 30, cloth: 5 }, time: 20 },
+  wood_legs: { materials: { wood: 20, cloth: 5 }, time: 20 },
+  wood_sandals: { materials: { wood: 15, cloth: 5 }, time: 20 },
+  bone_helmet: { materials: { bone: 10 }, time: 30 },
+  bone_chestplate: { materials: { bone: 30, cloth: 10 }, time: 30 },
+  bone_legs: { materials: { bone: 15, cloth: 5 }, time: 45 },
+  bone_boots: { materials: { bone: 15, cloth: 5 }, time: 30 },
+  leather_helmet: { materials: { leather: 10, sewing_kit: 2 }, time: 30 },
+  leather_chestplate: { materials: { leather: 15, sewing_kit: 4, rope: 1 }, time: 30 },
+  leather_legs: { materials: { leather: 10, sewing_kit: 2, rope: 1 }, time: 45 },
+  leather_boots: { materials: { leather: 7, sewing_kit: 2 }, time: 30 },
+  metal_helmet: { materials: { mvk: 5, sewing_kit: 3, rope: 1 }, time: 30 },
+  metal_chestplate: { materials: { mvk: 10, sewing_kit: 4, rope: 3, sheet_metal: 4 }, time: 30 },
+  metal_legs: { materials: { mvk: 8, sewing_kit: 3, rope: 3, sheet_metal: 3 }, time: 30 },
+  metal_boots: { materials: { mvk: 3, sewing_kit: 3, leather: 10 }, time: 30 },
+  rad_suit: { materials: { sewing_kit: 8, tarp: 10, mvk: 10 }, time: 60 },
+  backpack: { materials: { cloth: 24, rope: 2, leather: 10 }, time: 60 },
+
+  // Материалы (9)
+  rope: { materials: { cloth: 12 }, time: 10 },
+  sewing_kit: { materials: { cloth: 12, rope: 2 }, time: 30 },
+  gunpowder: { materials: { coal: 15, sulfur: 10 }, time: 8, output: 10 },
+  fuel_bottle: { materials: { animal_fat: 2, cloth: 1 }, time: 3, output: 2 },
+  gears: { materials: { scrap: 35, metal_fragment: 12, mvk: 1 }, time: 25 },
+  metal_pipe: { materials: { mvk: 2, scrap: 22 }, time: 15 },
+  metal_spring: { materials: { mvk: 2, scrap: 35 }, time: 15 },
+  explosives: { materials: { gunpowder: 15, fuel_bottle: 2, metal_fragment: 5 }, time: 10 },
+  battery: { materials: { targeting_computer: 1, tech_trash: 6, sheet_metal: 4 }, time: 30 },
+
+  // Другое (2)
+  sticker: { materials: { metal_fragment: 20 }, time: 25 },
+  snowball: { materials: { ice_shard: 1 }, time: 20, output: 25 },
 };
 
 /* =========================================================
-   ДОПОЛНИТЕЛЬНЫЕ РЕСУРСЫ (не отображаются в категориях)
+   ДОПОЛНИТЕЛЬНЫЕ РЕСУРСЫ
    ========================================================= */
 const EXTRA_RESOURCES = {
-  // базовые
   wood: { name: "Дерево", category: "Материалы" },
   stone: { name: "Камень", category: "Материалы" },
   cloth: { name: "Ткань", category: "Материалы" },
   leather: { name: "Кожа", category: "Материалы" },
   metal_fragment: { name: "Металлические фрагменты", category: "Материалы" },
-  // ранее добавленные
   scrap: { name: "Металлолом", category: "Материалы" },
   mvk: { name: "МВК", category: "Материалы" },
   sheet_metal: { name: "Листовой металл", category: "Материалы" },
   cctv_camera: { name: "Камера видеонаблюдения", category: "Материалы" },
   targeting_computer: { name: "Компьютер наведения", category: "Материалы" },
   metal_blade: { name: "Металлическое лезвие", category: "Материалы" },
-  // новые
   rope: { name: "Веревка", category: "Материалы" },
   shotgun: { name: "Дробовик", category: "Оружие" },
   b51: { name: "B51", category: "Оружие" },
@@ -563,6 +674,8 @@ const EXTRA_RESOURCES = {
   animal_fat: { name: "Животный жир", category: "Материалы" },
   gears: { name: "Шестерни", category: "Материалы" },
   metal_spring: { name: "Металлическая пружина", category: "Материалы" },
+  explosives: { name: "Взрывчатка", category: "Материалы" },
+  ice_shard: { name: "Осколок льда", category: "Материалы" },
 };
 
 /* =========================================================
@@ -640,6 +753,53 @@ function renderItems() {
   });
 }
 
+/* --- Форматирование времени --- */
+function formatTime(seconds) {
+  if (!seconds || seconds <= 0) return '0 сек';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  const parts = [];
+  if (h) parts.push(h + ' ч');
+  if (m) parts.push(m + ' мин');
+  if (s && !h) parts.push(s + ' сек');
+  return parts.join(' ') || '0 сек';
+}
+
+/* --- Сколько крафтов нужно, чтобы получить qty --- */
+function craftCount(itemId, qty) {
+  const entry = recipes[itemId];
+  if (!entry) return qty;
+  const output = entry.output || 1;
+  return Math.ceil(qty / output);
+}
+
+/* --- Рекурсивный расчёт времени --- */
+function calcCraftTime(itemId, qty, visiting) {
+  if (!itemId || qty <= 0) return 0;
+  if (visiting.has(itemId)) return 0;
+  const entry = recipes[itemId];
+  if (!entry) return 0;
+
+  const crafts = craftCount(itemId, qty);
+  const ownTime = (entry.time || 0) * crafts;
+  let subTime = 0;
+
+  if (entry.materials) {
+    visiting.add(itemId);
+    for (const [matId, amount] of Object.entries(entry.materials)) {
+      const needQty = amount * crafts;
+      const subRecipe = recipes[matId];
+      if (subRecipe && subRecipe.time) {
+        subTime += calcCraftTime(matId, needQty, visiting);
+      }
+    }
+    visiting.delete(itemId);
+  }
+
+  return ownTime + subTime;
+}
+
 function calculate() {
   if (!selectedId) {
     alert('Сначала выберите предмет из списка');
@@ -648,7 +808,13 @@ function calculate() {
 
   const item = getItem(selectedId);
   const qty = Math.max(1, parseInt(document.getElementById('qtyInput').value) || 1);
-  const recipe = recipes[selectedId];
+  const entry = recipes[selectedId];
+  const materials = entry ? entry.materials : null;
+  const output = entry ? (entry.output || 1) : 1;
+  const crafts = entry ? Math.ceil(qty / output) : 1;
+  const produced = crafts * output;
+  const surplus = produced - qty;
+  const ownTime = entry ? (entry.time || 0) : 0;
 
   document.getElementById('selectedItem').innerHTML = `
     <div class="icon">${getIconHTML(selectedId, item.category)}</div>
@@ -657,13 +823,15 @@ function calculate() {
   `;
 
   const tbody = document.getElementById('resultBody');
+  const timeBlock = document.getElementById('timeBlock');
   tbody.innerHTML = '';
+  timeBlock.innerHTML = '';
 
-  if (!recipe || Object.keys(recipe).length === 0) {
+  if (!materials || Object.keys(materials).length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Рецепт для «${item.name}» ещё не заполнен.</td></tr>`;
   } else {
-    for (const [matId, amount] of Object.entries(recipe)) {
-      const total = amount * qty;
+    for (const [matId, amount] of Object.entries(materials)) {
+      const total = amount * crafts;
       const mat = getItem(matId);
       const matName = mat ? mat.name : matId;
       const matCat = mat ? mat.category : null;
@@ -679,6 +847,55 @@ function calculate() {
     tbody.querySelectorAll('.owned-input').forEach(inp => {
       inp.addEventListener('input', updateMissing);
     });
+  }
+
+  // Информация о партии
+  let batchInfo = '';
+  if (output > 1) {
+    batchInfo = `
+      <div class="time-row" style="color:var(--accent);">
+        <span class="label">Партия</span>
+        <span class="val">${crafts} крафт(а) × ${output} шт. = ${produced} шт.${surplus > 0 ? ` (излишек ${surplus})` : ''}</span>
+      </div>`;
+  }
+
+  if (ownTime > 0 || (materials && Object.keys(materials).length > 0)) {
+    const ownTotal = ownTime * crafts;
+    let subTotal = 0;
+    if (materials) {
+      const visiting = new Set([selectedId]);
+      for (const [matId, amount] of Object.entries(materials)) {
+        const needQty = amount * crafts;
+        if (recipes[matId] && recipes[matId].time) {
+          subTotal += calcCraftTime(matId, needQty, visiting);
+        }
+      }
+    }
+    const grandTotal = ownTotal + subTotal;
+
+    let html = batchInfo;
+    if (ownTime > 0) {
+      html += `
+        <div class="time-row">
+          <span class="label">Своё время (${crafts}×${ownTime} сек)</span>
+          <span class="val">${formatTime(ownTotal)}</span>
+        </div>`;
+    }
+    if (subTotal > 0) {
+      html += `
+        <div class="time-row">
+          <span class="label">Время компонентов</span>
+          <span class="val">${formatTime(subTotal)}</span>
+        </div>`;
+    }
+    html += `
+      <div class="time-row total">
+        <span class="label">Общее время</span>
+        <span class="val">${formatTime(grandTotal)}</span>
+      </div>`;
+    timeBlock.innerHTML = html;
+  } else if (batchInfo) {
+    timeBlock.innerHTML = batchInfo;
   }
 
   document.getElementById('resultPanel').style.display = 'block';
